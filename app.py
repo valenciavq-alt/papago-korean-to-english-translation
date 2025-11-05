@@ -369,7 +369,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
     # HERO / BANNER
     gr.Markdown(
         """
-        ## Papago Korean-to-English Localized Translator – For Native Korean, Video & Audio
+        ## Korean-to-English Localized Translator – For Native Korean, Video & Audio
         
         한국어 사용자와 현지 방언을 위한 최고의 번역 도구입니다. 오디오와 비디오 모두 지원합니다.
         """
