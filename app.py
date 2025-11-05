@@ -275,10 +275,10 @@ def transcribe_and_translate(
         progress: Gradio progress tracker
         
     Returns:
-        Tuple of (SRT file, video with subtitles, Korean text, English text)
+        Tuple of (SRT file, video with subtitles, Korean text, English text, SRT ETA text, Video ETA text)
     """
     if audio_file is None and not url_input:
-        return None, None, "Please upload an audio or video file or provide a URL.", None
+        return None, None, "Please upload an audio or video file or provide a URL.", None, "", ""
     
     # Get credentials from environment variables (Hugging Face Secrets)
     papago_client_id = os.getenv("PAPAGO_CLIENT_ID")
@@ -290,7 +290,7 @@ def transcribe_and_translate(
     try:
         # Handle Gradio File object
         if audio_file is None and not url_input:
-            return None, None, "Please upload an audio or video file or provide a URL.", None
+            return None, None, "Please upload an audio or video file or provide a URL.", None, "", ""
         
         # Determine source: uploaded file or server-side download from URL
         if audio_file is not None:
@@ -323,6 +323,9 @@ def transcribe_and_translate(
         if os.path.exists(audio_path):
             print(f"📹 File size: {os.path.getsize(audio_path) / 1024 / 1024:.2f} MB")
         
+        # Pre-calc video duration for ETA (if video)
+        vid_duration = get_media_duration_seconds(audio_path) if is_video else None
+
         # Use best Whisper model automatically (large-v3)
         whisper_model = "large-v3"
         
@@ -350,6 +353,7 @@ def transcribe_and_translate(
         
         # Generate bilingual SRT with progress tracking and ETA
         est_translate_secs = max(5, int(len(segments) * 1.2))  # heuristic ~1.2s per segment
+        srt_eta_text = f"Estimated time: ~{_format_eta(est_translate_secs)}"
         progress(0.6, desc=f"Translating {len(segments)} segments (~{est_translate_secs}s)...")
         srt_content = segments_to_srt(segments, translator, show_progress=False, progress_callback=progress)
         
@@ -382,13 +386,15 @@ def transcribe_and_translate(
         # Generate video with burned-in subtitles if input is video
         video_output = None
         video_error = None
+        video_eta_text = ""
         if is_video:
             # Estimate burn-in time from input duration (heuristic ~8x realtime + 30s setup)
-            vid_dur = get_media_duration_seconds(audio_path)
+            vid_dur = vid_duration
             if vid_dur is not None and vid_dur > 0:
                 est_burn_secs = int(vid_dur * 8 + 30)
                 if est_burn_secs > 900:
                     est_burn_secs = 900  # cap at 15 minutes to avoid scaring users
+                video_eta_text = f"Estimated time: ~{_format_eta(est_burn_secs)}"
                 progress(0.8, desc=f"Burning subtitles into video (~{est_burn_secs//60}m {est_burn_secs%60}s)...")
             else:
                 progress(0.8, desc=f"Burning subtitles into video (input: {os.path.basename(audio_path)})...")
@@ -440,13 +446,13 @@ def transcribe_and_translate(
         if video_error:
             english_text = f"{english_text}\n\n{video_error}"
         
-        return srt_file, video_output, korean_text, english_text
+        return srt_file, video_output, korean_text, english_text, srt_eta_text, video_eta_text
         
     except Exception as e:
         error_msg = f"Error: {str(e)}"
         import traceback
         traceback.print_exc()
-        return None, None, error_msg, None
+        return None, None, error_msg, None, "", ""
 
 
 # Create Gradio interface
@@ -505,6 +511,9 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
         with gr.Column():
             video_output = gr.Video(label="🎬 Video with Burned-in Subtitles (Korean + English)")
             srt_output = gr.File(label="📄 SRT Subtitle File (for CapCut)")
+            # ETA lines placed directly under each output section
+            srt_eta_line = gr.Markdown("")
+            video_eta_line = gr.Markdown("")
             
             with gr.Tabs():
                 with gr.Tab("Korean Transcription"):
@@ -539,7 +548,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
     process_btn.click(
         fn=transcribe_and_translate,
         inputs=[audio_input, url_input],
-        outputs=[srt_output, video_output, korean_output, english_output]
+        outputs=[srt_output, video_output, korean_output, english_output, srt_eta_line, video_eta_line]
     )
 
     # Mark upload completion explicitly to guide mobile usage
@@ -553,7 +562,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
     audio_input.upload(
         fn=transcribe_and_translate,
         inputs=[audio_input],
-        outputs=[srt_output, video_output, korean_output, english_output]
+        outputs=[srt_output, video_output, korean_output, english_output, srt_eta_line, video_eta_line]
     )
 
 
