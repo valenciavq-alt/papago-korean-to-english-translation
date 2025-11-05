@@ -59,8 +59,7 @@ def on_upload_complete(file_obj):
     """Return a user-facing message once the upload is finished on the server."""
     # Provide a clear cue that it's safe to background after this point
     return (
-        "✅ Upload complete. You can switch apps now. When you tap ‘Process’,"
-        " processing runs on the server and will continue even if you leave the app."
+        "✅ Upload complete. When you tap ‘Process’, processing runs on the server and will continue even if you leave the app."
     )
 
 
