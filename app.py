@@ -366,37 +366,55 @@ def transcribe_and_translate(
 
 # Create Gradio interface
 with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as demo:
+    # HERO / BANNER
     gr.Markdown(
         """
-        # 🎤 Korean Audio Transcription & Translation
+        ## Papago Korean-to-English Localized Translator – For Native Korean, Video & Audio
         
-        Upload Korean audio or video files to:
-        - Transcribe Korean speech using Whisper (large-v3 model)
-        - Translate to English using Papago API
-        - Generate **SRT subtitle file** for editing in CapCut
-        - Generate **video with burned-in subtitles** (Korean + English)
-        
-        **Note:** Papago API credentials are configured in Space settings (Secrets).
+        한국어 사용자와 현지 방언을 위한 최고의 번역 도구입니다. 오디오와 비디오 모두 지원합니다.
         """
     )
+    # Features block (directly under subtitle)
+    gr.Markdown(
+        """
+        #### Features
+        - 🎯 **Korean Speech Recognition** - Uses Whisper large-v3 model automatically for best accuracy
+        - 🌐 **Automatic Translation** - Translates Korean to English using Papago API
+        - 📝 **SRT Subtitle File** - Downloadable SRT file perfect for editing in CapCut
+        - 🎬 **Video with Subtitles** - Automatically generates video with Korean and English subtitles burned in
+        """
+    )
+    # (Removed inline Features/How to use block to avoid duplication)
     
+    # Removed step headers to avoid redundancy
+
+    # NOTE (avoid repeating features listed below)
+    gr.Markdown("Note: Papago API credentials are configured in Space settings (Secrets).")
+
     with gr.Row():
         with gr.Column():
+            upload_type = gr.Radio(
+                ["Video", "Audio"],
+                value="Video",
+                label="Upload Type"
+            )
             audio_input = gr.File(
-                label="Audio/Video File",
+                label="Audio/Video File (한국어로 된 영상 또는 음성을 업로드하세요)",
                 file_types=[".mp3", ".wav", ".mp4", ".avi", ".m4a", ".flac", ".mov", ".mkv"]
             )
             
             process_btn = gr.Button("🚀 Process", variant="primary", size="lg")
+            gr.Markdown(
+                """
+                Works with both Korean video and audio! Local everyday language understood.
+                
+                You can switch apps after upload—processing continues in the background.
+                """
+            )
         
         with gr.Column():
-            srt_output = gr.File(
-                label="📄 SRT Subtitle File (for CapCut)"
-            )
-            
-            video_output = gr.Video(
-                label="🎬 Video with Burned-in Subtitles (Korean + English)"
-            )
+            video_output = gr.Video(label="🎬 Video with Burned-in Subtitles (Korean + English)")
+            srt_output = gr.File(label="📄 SRT Subtitle File (for CapCut)")
             
             with gr.Tabs():
                 with gr.Tab("Korean Transcription"):
@@ -415,21 +433,17 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
                         placeholder="English translation will appear here..."
                     )
     
+    # BOTTOM: HOW TO USE + NOTE
     gr.Markdown(
         """
         ### 📥 How to use:
-        1. Upload an audio or video file containing Korean speech
-        2. Click "Process" to transcribe and translate
-        3. Download:
-           - **SRT file** - Use this in CapCut for editing
-           - **Video with subtitles** - Ready-to-use video with Korean and English subtitles burned in
-        
-        ### 💡 Tips:
-        - Uses Whisper large-v3 model automatically for best accuracy
-        - Video processing requires ffmpeg (already installed)
-        - SRT file contains Korean (top) and English (bottom) for easy editing in CapCut
+        - Upload an audio or video file containing Korean speech  
+        - Click ‘Process’ to transcribe and translate  
+        - Download: **SRT file**; **Video with subtitles**
         """
     )
+
+    # FOOTER (removed on request)
     
     # Connect the processing function
     process_btn.click(
@@ -440,5 +454,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
 
 
 if __name__ == "__main__":
+    # Enable queue so jobs continue if client disconnects (mobile sleep/lock)
+    demo.queue(default_concurrency_limit=2, max_size=64, status_update_rate=1, keep_on_disconnect=True)
     # Let Gradio auto-detect for Hugging Face Spaces
     demo.launch()

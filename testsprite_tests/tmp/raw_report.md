@@ -15,7 +15,7 @@
 #### Test frontend-smoke
 - **Test Name:** Frontend UI Smoke Tests
 - **Test Code:** [frontend-smoke_Frontend_UI_Smoke_Tests.py](./frontend-smoke_Frontend_UI_Smoke_Tests.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/8b4c2d8d-ac2d-4625-ae20-21cbd82d63da/1f0bf90a-1d2d-4edd-9584-92af740fd070
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/6677ac17-2607-4668-8639-a1975bed48a5/4c53231c-ab05-47e8-9c00-efcbd31a0cef
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -23,8 +23,8 @@
 #### Test e2e-mp4
 - **Test Name:** E2E: Upload MP4 and Process
 - **Test Code:** [e2e-mp4_E2E_Upload_MP4_and_Process.py](./e2e-mp4_E2E_Upload_MP4_and_Process.py)
-- **Test Error:** The task to upload a tiny MP4 file, click Process, and wait for completion text was not fully completed because the file upload and processing steps were not performed. The main page is loaded with the upload button and process button visible, and Papago API credentials fields are empty. The file upload input does not support direct text input, requiring a file upload function which was not executed. Therefore, the task is stopped now with success set to false.
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/8b4c2d8d-ac2d-4625-ae20-21cbd82d63da/14726e5e-7c75-4220-9a1d-80e2ed598ee8
+- **Test Error:** The file upload function is not working as expected on the page. The system does not detect the uploaded file, preventing processing. Reporting the issue and stopping further actions.
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/6677ac17-2607-4668-8639-a1975bed48a5/b3630e05-4f51-4547-93c4-87ed36dd9e5c
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---

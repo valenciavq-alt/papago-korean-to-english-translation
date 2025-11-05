@@ -1,4 +1,116 @@
 {
+  "tech_stack": [
+    "python",
+    "gradio",
+    "huggingface-spaces",
+    "ffmpeg",
+    "openai-whisper",
+    "urllib (Papago API)",
+    "ass/srt subtitles"
+  ],
+  "features": [
+    {
+      "name": "Gradio UI",
+      "description": "Blocks UI with upload, process button, outputs for video and SRT, tabs for Korean/English, and queue enabled with keep_on_disconnect.",
+      "files": ["app.py"]
+    },
+    {
+      "name": "Transcription and Translation Pipeline",
+      "description": "Loads Whisper large-v3, transcribes Korean, translates via Papago, builds SRT, and optionally burns subtitles into video.",
+      "files": ["app.py", "papago_translation.py"]
+    },
+    {
+      "name": "ASS Subtitle Generation",
+      "description": "Creates styled ASS with NanumGothic, unified styling, PlayRes derived from input resolution, and layered KR over EN at bottom-center.",
+      "files": ["app.py"]
+    },
+    {
+      "name": "FFmpeg Burn-in",
+      "description": "Uses ffmpeg with subtitles filter to burn ASS into video; probes resolution with ffprobe; re-encodes with libx264/aac.",
+      "files": ["app.py"]
+    },
+    {
+      "name": "Papago Translation Service",
+      "description": "HTTP client for Naver Papago API with timeout and error handling.",
+      "files": ["papago_translation.py"]
+    },
+    {
+      "name": "SRT Builder",
+      "description": "Converts Whisper segments to bilingual SRT with strict CapCut-compatible formatting and LF encoding.",
+      "files": ["papago_translation.py"]
+    }
+  ]
+}
+
+{
+  "tech_stack": [
+    "python",
+    "gradio",
+    "ffmpeg",
+    "huggingface-spaces",
+    "pytest",
+    "testsprite"
+  ],
+  "features": [
+    {
+      "name": "Gradio Web App",
+      "description": "User interface for uploading audio/video, running transcription/translation, and downloading SRT or burned-in video.",
+      "files": [
+        "app.py"
+      ]
+    },
+    {
+      "name": "Papago Translation Service",
+      "description": "Wraps Papago API for Korean→English translation and builds SRT content with correct formatting.",
+      "files": [
+        "papago_translation.py",
+        "test_papago_translation.py"
+      ]
+    },
+    {
+      "name": "Subtitle Rendering (FFmpeg/ASS/SRT)",
+      "description": "Generates ASS/SRT subtitles, enforces fonts/colors/sizes/positions, and burns subtitles into video via FFmpeg.",
+      "files": [
+        "app.py"
+      ]
+    },
+    {
+      "name": "HF Space Deployment",
+      "description": "Configs and docs for deploying to Hugging Face Spaces, including requirements and packages.",
+      "files": [
+        "README_HF.md",
+        "requirements_hf.txt",
+        "packages.txt",
+        "HF_SPACE_README.md",
+        "DEPLOY_TO_HF.md",
+        "DEPLOYMENT_INSTRUCTIONS.md",
+        "SIMPLE_DEPLOY.md",
+        "MANUAL_UPLOAD.md",
+        "SYNC_USAGE.md",
+        "sync_to_hf.sh"
+      ]
+    },
+    {
+      "name": "Testsprite E2E Tests",
+      "description": "Automated UI tests to upload an MP4, trigger processing, and validate outputs.",
+      "files": [
+        "testsprite_tests/frontend-smoke_Frontend_UI_Smoke_Tests.py",
+        "testsprite_tests/e2e-mp4_E2E_Upload_MP4_and_Process.py",
+        "testsprite_tests/testsprite_frontend_test_plan.json",
+        "testsprite_tests/assets/sample.mp4"
+      ]
+    },
+    {
+      "name": "Local Run Script",
+      "description": "Helper script to run the Gradio app locally.",
+      "files": [
+        "run_app.sh"
+      ]
+    }
+  ]
+}
+
+{
   "projectName": "Papago Korean→English Transcription & Subtitles",
   "techStack": {
     "language": "Python",

@@ -7,10 +7,10 @@
     "projectName": "papago-translation",
     "projectPath": "/Users/valencia/papago-translation",
     "testIds": [],
-    "additionalInstruction": "Use running frontend on http://localhost:7860 for UI-based cases.",
+    "additionalInstruction": "Use actual file input for upload. Wait for processing to complete and verify that outputs are generated even if the page is refreshed mid-run (simulating mobile app switching).",
     "envs": {
       "API_KEY": "sk-user-YYdTld_y4noiYLf9bRTDwwkQxMbJJ971dX73H2zgSrBqvywVeyQicswQZcJtBpnb_FbM9xef86bo4zJ8siULx-qwH60cDg63VGAQGF1XOCc_C1MrGdYrOFYvHgsqlec1hkI"
     }
   },
-  "proxy": "http://e92aa1b6-cb9b-4f6d-979f-1e269fb0ee50:Q15zLdIIm315N8HpeRciwF4Ejn7Jhvbe@tun.testsprite.com:8080"
+  "proxy": "http://e860c944-f697-417d-be1d-54d196dcf060:fQ8x9LKSvq5h9HMzkiqCqrOph7wfmXVx@tun.testsprite.com:8080"
 }
