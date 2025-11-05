@@ -55,12 +55,49 @@ except ImportError:
 from papago_translation import PapagoTranslator, segments_to_srt, timestamp_to_srt
 
 
+def _extract_file_path(file_obj) -> str | None:
+    if file_obj is None:
+        return None
+    if isinstance(file_obj, str):
+        return file_obj
+    if hasattr(file_obj, 'name'):
+        return file_obj.name
+    if isinstance(file_obj, dict) and 'name' in file_obj:
+        return file_obj['name']
+    try:
+        return str(file_obj)
+    except Exception:
+        return None
+
+
+def _format_eta(seconds_total: int) -> str:
+    minutes = seconds_total // 60
+    seconds = seconds_total % 60
+    if minutes > 0:
+        return f"{minutes}m {seconds}s"
+    return f"{seconds}s"
+
+
 def on_upload_complete(file_obj):
-    """Return a user-facing message once the upload is finished on the server."""
-    # Provide a clear cue that it's safe to background after this point
-    return (
+    """Return a user-facing message once the upload is finished on the server, with ETA."""
+    media_path = _extract_file_path(file_obj)
+    dur_sec = get_media_duration_seconds(media_path) if media_path else None
+
+    # Heuristics:
+    # - SRT/translation: ~0.6x video duration + 20s overhead (network + batching)
+    # - Burn-in video: ~8x realtime + 30s (encode + filter setup)
+    srt_eta = None
+    burn_eta = None
+    if isinstance(dur_sec, (int, float)) and dur_sec > 0:
+        srt_eta = int(dur_sec * 0.6 + 20)
+        burn_eta = int(dur_sec * 8 + 30)
+
+    base = (
         "✅ Upload complete. When you tap ‘Process’, processing runs on the server and will continue even if you leave the app."
     )
+    if srt_eta and burn_eta:
+        return base + f"\nEstimated times — SRT: ~{_format_eta(srt_eta)} · Video: ~{_format_eta(burn_eta)}"
+    return base
 
 
 def get_media_duration_seconds(media_path: str) -> float | None:
