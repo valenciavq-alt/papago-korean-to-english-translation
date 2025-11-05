@@ -452,5 +452,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
 
 
 if __name__ == "__main__":
+    # Enable queue so jobs continue if client disconnects (mobile sleep/lock)
+    demo.queue(default_concurrency_limit=2, max_size=64, status_update_rate=1, keep_on_disconnect=True)
     # Let Gradio auto-detect for Hugging Face Spaces
     demo.launch()
