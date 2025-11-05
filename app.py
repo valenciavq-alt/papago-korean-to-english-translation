@@ -79,13 +79,11 @@ def _format_eta(seconds_total: int) -> str:
 
 
 def on_upload_complete(file_obj):
-    """Return a user-facing message once the upload is finished on the server, with ETA."""
+    """Return upload-complete message and populate SRT/Video ETA lines immediately."""
     media_path = _extract_file_path(file_obj)
     dur_sec = get_media_duration_seconds(media_path) if media_path else None
 
-    # Heuristics:
-    # - SRT/translation: ~0.6x video duration + 20s overhead (network + batching)
-    # - Burn-in video: ~8x realtime + 30s (encode + filter setup)
+    # Heuristics
     srt_eta = None
     burn_eta = None
     if isinstance(dur_sec, (int, float)) and dur_sec > 0:
@@ -95,9 +93,9 @@ def on_upload_complete(file_obj):
     base = (
         "✅ Upload complete. When you tap ‘Process’, processing runs on the server and will continue even if you leave the app."
     )
-    if srt_eta and burn_eta:
-        return base + f"\nEstimated times — SRT: ~{_format_eta(srt_eta)} · Video: ~{_format_eta(burn_eta)}"
-    return base
+    srt_line = f"Estimated time: ~{_format_eta(srt_eta)}" if srt_eta else ""
+    video_line = f"Estimated time: ~{_format_eta(burn_eta)}" if burn_eta else ""
+    return base, srt_line, video_line
 
 
 def get_media_duration_seconds(media_path: str) -> float | None:
@@ -555,7 +553,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
     audio_input.upload(
         fn=on_upload_complete,
         inputs=[audio_input],
-        outputs=[upload_status]
+        outputs=[upload_status, srt_eta_line, video_eta_line]
     )
 
     # Auto-start processing immediately after upload so job is queued server-side
