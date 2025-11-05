@@ -263,6 +263,7 @@ def burn_subtitles_to_video(video_path: str, segments: list, translator: PapagoT
 
 def transcribe_and_translate(
     audio_file,
+    url_input: str | None = None,
     progress=gr.Progress()
 ):
     """
@@ -276,8 +277,8 @@ def transcribe_and_translate(
     Returns:
         Tuple of (SRT file, video with subtitles, Korean text, English text)
     """
-    if audio_file is None:
-        return None, None, "Please upload an audio or video file.", None
+    if audio_file is None and not url_input:
+        return None, None, "Please upload an audio or video file or provide a URL.", None
     
     # Get credentials from environment variables (Hugging Face Secrets)
     papago_client_id = os.getenv("PAPAGO_CLIENT_ID")
@@ -288,18 +289,31 @@ def transcribe_and_translate(
     
     try:
         # Handle Gradio File object
-        if audio_file is None:
-            return None, None, "Please upload an audio or video file.", None
+        if audio_file is None and not url_input:
+            return None, None, "Please upload an audio or video file or provide a URL.", None
         
-        # Extract file path from Gradio File object
-        if isinstance(audio_file, str):
-            audio_path = audio_file
-        elif hasattr(audio_file, 'name'):
-            audio_path = audio_file.name
-        elif isinstance(audio_file, dict) and 'name' in audio_file:
-            audio_path = audio_file['name']
+        # Determine source: uploaded file or server-side download from URL
+        if audio_file is not None:
+            # Extract file path from Gradio File object
+            if isinstance(audio_file, str):
+                audio_path = audio_file
+            elif hasattr(audio_file, 'name'):
+                audio_path = audio_file.name
+            elif isinstance(audio_file, dict) and 'name' in audio_file:
+                audio_path = audio_file['name']
+            else:
+                audio_path = str(audio_file)
         else:
-            audio_path = str(audio_file)
+            # Download from URL to temp file on server (faster than mobile upload)
+            try:
+                import urllib.request
+                progress(0.08, desc="Fetching media from URL on server...")
+                tmp_dir = tempfile.gettempdir()
+                url_fname = f"download_{int(time.time())}.bin"
+                audio_path = os.path.join(tmp_dir, url_fname)
+                urllib.request.urlretrieve(url_input, audio_path)
+            except Exception as e:
+                return None, None, f"Failed to download from URL: {e}", None
         
         # Check if input is video or audio
         is_video = any(audio_path.lower().endswith(ext) for ext in ['.mp4', '.avi', '.mov', '.mkv', '.webm'])
@@ -474,6 +488,10 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
                 file_types=[".mp3", ".wav", ".mp4", ".avi", ".m4a", ".flac", ".mov", ".mkv"]
             )
             upload_status = gr.Markdown("", elem_id="upload-status")
+            url_input = gr.Textbox(
+                label="Or paste a direct media URL (optional)",
+                placeholder="https://... (MP4/MOV/MP3/WAV)",
+            )
             
             process_btn = gr.Button("🚀 Process", variant="primary", size="lg")
             gr.Markdown(
@@ -520,7 +538,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
     # Connect the processing function (manual trigger)
     process_btn.click(
         fn=transcribe_and_translate,
-        inputs=[audio_input],
+        inputs=[audio_input, url_input],
         outputs=[srt_output, video_output, korean_output, english_output]
     )
 
