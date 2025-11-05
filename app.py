@@ -416,7 +416,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
             process_btn = gr.Button("🚀 Process", variant="primary", size="lg")
             gr.Markdown(
                 """
-                You can switch apps after upload—processing continues in the background.
+                Upload auto-starts processing when finished. You can switch apps after upload—processing continues in the background.
                 """
             )
         
@@ -453,7 +453,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
 
     # FOOTER (removed on request)
     
-    # Connect the processing function
+    # Connect the processing function (manual trigger)
     process_btn.click(
         fn=transcribe_and_translate,
         inputs=[audio_input],
@@ -465,6 +465,13 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
         fn=on_upload_complete,
         inputs=[audio_input],
         outputs=[upload_status]
+    )
+
+    # Auto-start processing immediately after upload so job is queued server-side
+    audio_input.upload(
+        fn=transcribe_and_translate,
+        inputs=[audio_input],
+        outputs=[srt_output, video_output, korean_output, english_output]
     )
 
 
