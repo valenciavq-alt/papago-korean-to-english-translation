@@ -407,6 +407,8 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
             gr.Markdown(
                 """
                 Works with both Korean video and audio! Local everyday language understood.
+                
+                You can switch apps after upload—processing continues in the background.
                 """
             )
         
