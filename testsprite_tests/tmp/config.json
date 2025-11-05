@@ -7,7 +7,7 @@
     "projectName": "papago-translation",
     "projectPath": "/Users/valencia/papago-translation",
     "testIds": [],
-    "additionalInstruction": "Use the existing testsprite_frontend_test_plan.json. Upload testsprite_tests/assets/sample.mp4 via the file input, click Process, then verify SRT and video outputs are present.",
+    "additionalInstruction": "Use the existing testsprite_frontend_test_plan.json. Upload testsprite_tests/assets/sample.mp4 via file input, click Process, and verify SRT and video outputs appear.",
     "envs": {
       "API_KEY": "sk-user-YYdTld_y4noiYLf9bRTDwwkQxMbJJ971dX73H2zgSrBqvywVeyQicswQZcJtBpnb_FbM9xef86bo4zJ8siULx-qwH60cDg63VGAQGF1XOCc_C1MrGdYrOFYvHgsqlec1hkI"
     }
