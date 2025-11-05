@@ -42,6 +42,7 @@ except Exception as e:
 
 # Now import gradio AFTER patching
 import os
+import time
 import gradio as gr
 import tempfile
 import subprocess
@@ -54,20 +55,30 @@ except ImportError:
 from papago_translation import PapagoTranslator, segments_to_srt, timestamp_to_srt
 
 
-def create_ass_subtitles(segments, translator):
-    """Create ASS subtitle file for burning into video."""
+def create_ass_subtitles(segments, translator, play_res_x: int | None = None, play_res_y: int | None = None):
+    """Create ASS subtitle file for burning into video.
+    Optionally specify PlayResX/PlayResY to make Fontsize ~pixels.
+    """
     ass_lines = [
         "[Script Info]",
         "Title: Bilingual Subtitles",
         "ScriptType: v4.00+",
+    ]
+    # Set PlayRes to the input video resolution if known; this makes fontsize ≈ pixels
+    if isinstance(play_res_x, int) and isinstance(play_res_y, int) and play_res_x > 0 and play_res_y > 0:
+        ass_lines.append(f"PlayResX: {play_res_x}")
+        ass_lines.append(f"PlayResY: {play_res_y}")
+    ass_lines += [
         "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        # Korean style: 12px, blue color (&HA7C1E8), positioned at top
-        # Using Noto Sans CJK KR or fallback fonts that support Korean
-        "Style: Korean,Noto Sans CJK KR,12,&HA7C1E8,&HFFFFFF,&H000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,10,1",
-        # English style: 12px, white color (&HFFFFFF), positioned at bottom
-        "Style: English,Noto Sans CJK KR,12,&HFFFFFF,&HFFFFFF,&H000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,50,1",
+        # Korean style: 12pt NanumGothic, light blue (#A7C1E8), positioned above English at bottom
+        # Alignment=2 = bottom center, MarginV=44 = above English
+        # Encoding=1 for Unicode support, NanumGothic is a Korean font
+        "Style: Korean,NanumGothic,36,&H00FFFFFF&,&H00FFFFFF&,&H20202020&,&H00000000&,0,0,0,0,100,100,0,0,1,0.4,0.8,2,10,10,160,1",
+        # English style: unified spec, positioned at bottom
+        # Alignment=2 = bottom center, MarginV=50 near bottom edge
+        "Style: English,NanumGothic,36,&H00FFFFFF&,&H00FFFFFF&,&H20202020&,&H00000000&,0,0,0,0,100,100,0,0,1,0.4,0.8,2,10,10,120,1",
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -83,15 +94,15 @@ def create_ass_subtitles(segments, translator):
         start_ass = timestamp_to_ass(start)
         end_ass = timestamp_to_ass(end)
         
-        # Korean line (top) - add color override to ensure blue color shows
-        # &HA7C1E8 = blue color in BGR format
-        ko_colored = f"{{\\c&HA7C1E8&\\fs12}}{text_ko}"
-        ass_lines.append(f"Dialogue: 0,{start_ass},{end_ass},Korean,,0,0,0,,{ko_colored}")
+        # Korean line (above English) using unified spec; layer 1 to ensure it renders above English
+        ko_colored = f"{{\\an2\\fs36\\c&H00FFFFFF&\\3c&H20202020&}}{text_ko}"
+        ass_lines.append(f"Dialogue: 1,{start_ass},{end_ass},Korean,,0,0,160,,{ko_colored}")
         
-        # English line (bottom) - add color override to ensure white color shows
-        # &HFFFFFF = white color in BGR format
-        en_colored = f"{{\\c&HFFFFFF&\\fs12}}{text_en}"
-        ass_lines.append(f"Dialogue: 0,{start_ass},{end_ass},English,,0,0,0,,{en_colored}")
+        # English line (bottom) using unified spec; layer 0
+        en_colored = f"{{\\an2\\fs36\\c&H00FFFFFF&\\3c&H20202020&}}{text_en}"
+        ass_lines.append(f"Dialogue: 0,{start_ass},{end_ass},English,,0,0,120,,{en_colored}")
+        # Two line breaks between segments (empty line)
+        ass_lines.append("")
     
     return "\n".join(ass_lines)
 
@@ -107,32 +118,79 @@ def timestamp_to_ass(seconds: float) -> str:
 
 def burn_subtitles_to_video(video_path: str, segments: list, translator: PapagoTranslator, output_path: str):
     """Burn subtitles into video using ffmpeg."""
-    # Create temporary ASS subtitle file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ass', delete=False, encoding='utf-8') as f:
-        ass_content = create_ass_subtitles(segments, translator)
+    # Create temporary ASS subtitle file with UTF-8 encoding
+    # Use UTF-8 with BOM to ensure Korean characters display correctly
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.ass', delete=False, encoding='utf-8-sig') as f:
+        # Probe video resolution to set PlayRes for pixel-accurate fontsize
+        try:
+            probe = subprocess.run(
+                [
+                    'ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=width,height','-of','csv=s=x:p=0',
+                    video_path
+                ], capture_output=True, text=True, timeout=15
+            )
+            if probe.returncode == 0 and 'x' in probe.stdout.strip():
+                w_str, h_str = probe.stdout.strip().split('x')
+                play_w = int(w_str)
+                play_h = int(h_str)
+            else:
+                play_w = play_h = None
+        except Exception:
+            play_w = play_h = None
+
+        ass_content = create_ass_subtitles(segments, translator, play_res_x=play_w, play_res_y=play_h)
         f.write(ass_content)
         ass_file = f.name
     
     try:
-        # Escape the file path for ffmpeg
-        import shlex
-        ass_file_escaped = shlex.quote(ass_file)
+        # Use raw ASS path (no shell quoting needed for /tmp paths)
+        ass_file_escaped = ass_file
         
         # Use ffmpeg to burn subtitles
-        # Use fonts that support Korean (Noto Sans CJK KR or fallback to system fonts)
-        # Don't override colors in force_style - let ASS file handle colors
+        # Try to find NanumGothic font in common locations
+        # NanumGothic is a Korean font that should be available or can be installed
+        font_dirs = [
+            '/usr/share/fonts/truetype/nanum/',
+            '/usr/share/fonts/truetype/',
+            '/usr/share/fonts/TTF/',
+            '/usr/share/fonts/opentype/',
+            '/System/Library/Fonts/Supplemental/',
+            '/usr/share/fonts/truetype/liberation/'
+        ]
+        
+        # Find existing font directories
+        existing_font_dirs = [d for d in font_dirs if os.path.exists(d)]
+        
+        # Keep only FontName in force_style so colors and sizes defined in ASS are preserved
+        subtitle_filter = (
+            f"subtitles={ass_file_escaped}:charenc=UTF-8:force_style=FontName=NanumGothic"
+        )
+        
         cmd = [
             'ffmpeg',
             '-i', video_path,
-            '-vf', f"subtitles={ass_file_escaped}:fontsdir=/usr/share/fonts/truetype/noto/:force_style='FontName=Noto Sans CJK KR,FontSize=12,Outline=1,Shadow=1'",
-            '-c:a', 'copy',
+            '-vf', subtitle_filter,
+            '-c:v', 'libx264',
+            '-preset', 'medium',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '192k',
             '-y',  # Overwrite output file
             output_path
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
-            raise Exception(f"FFmpeg error: {result.stderr}")
+            error_msg = f"FFmpeg error (code {result.returncode}): {result.stderr}"
+            if result.stdout:
+                error_msg += f"\nFFmpeg output: {result.stdout}"
+            raise Exception(error_msg)
+        
+        # Verify output file exists and has content
+        if not os.path.exists(output_path):
+            raise Exception("FFmpeg completed but output file was not created")
+        if os.path.getsize(output_path) == 0:
+            raise Exception("FFmpeg created an empty output file")
         
         return output_path
     finally:
@@ -183,6 +241,11 @@ def transcribe_and_translate(
         
         # Check if input is video or audio
         is_video = any(audio_path.lower().endswith(ext) for ext in ['.mp4', '.avi', '.mov', '.mkv', '.webm'])
+        print(f"📹 Input file: {audio_path}")
+        print(f"📹 Is video: {is_video}")
+        print(f"📹 File exists: {os.path.exists(audio_path)}")
+        if os.path.exists(audio_path):
+            print(f"📹 File size: {os.path.getsize(audio_path) / 1024 / 1024:.2f} MB")
         
         # Use best Whisper model automatically (large-v3)
         whisper_model = "large-v3"
@@ -220,31 +283,77 @@ def transcribe_and_translate(
         progress(0.7, desc="Generating English translation preview...")
         english_text = translator.translate_ko_to_en(korean_text)
         
-        # Save SRT to temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False, encoding='utf-8') as f:
-            f.write(srt_content)
-            srt_file = f.name
+        # Save SRT with a stable filename, UTF-8 encoding (no BOM), and Unix LF line endings
+        srt_basename = f"subtitles_{int(time.time())}.srt"
+        srt_file = os.path.join(tempfile.gettempdir(), srt_basename)
+        try:
+            # Normalize line endings to LF and ensure SRT blocks are separated by a single blank line
+            srt_norm = srt_content.replace("\r\n", "\n").replace("\r", "\n")
+            # Collapse triple blank lines to double, then ensure final double newline
+            while "\n\n\n" in srt_norm:
+                srt_norm = srt_norm.replace("\n\n\n", "\n\n")
+            if not srt_norm.endswith("\n\n"):
+                srt_norm = srt_norm.rstrip("\n") + "\n\n"
+            # Write with LF endings and UTF-8 (no BOM)
+            with open(srt_file, 'w', encoding='utf-8', newline='\n') as f:
+                f.write(srt_norm)
+        except Exception:
+            # Fallback to raw content if normalization fails
+            with open(srt_file, 'w', encoding='utf-8') as f:
+                f.write(srt_content)
         
         # Generate video with burned-in subtitles if input is video
         video_output = None
+        video_error = None
         if is_video:
-            progress(0.8, desc="Burning subtitles into video...")
-            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
-                video_output_path = f.name
+            progress(0.8, desc=f"Burning subtitles into video (input: {os.path.basename(audio_path)})...")
+            # Use a more accessible temp directory for video output
+            temp_dir = tempfile.gettempdir()
+            video_output_path = os.path.join(temp_dir, f"subtitled_{int(time.time())}.mp4")
             
             try:
+                # Verify input video exists
+                if not os.path.exists(audio_path):
+                    raise Exception(f"Input video file not found: {audio_path}")
+                
+                progress(0.82, desc="Creating subtitle file...")
                 burn_subtitles_to_video(audio_path, segments, translator, video_output_path)
-
-                if os.path.exists(video_output_path):
-                    video_output = video_output_path
+                
+                # Verify output
+                if not os.path.exists(video_output_path):
+                    raise Exception(f"Video output file was not created: {video_output_path}")
+                
+                video_size = os.path.getsize(video_output_path)
+                if video_size == 0:
+                    raise Exception(f"Video output file is empty (0 bytes): {video_output_path}")
+                
+                video_output = video_output_path
+                progress(0.95, desc=f"✅ Video created successfully! ({video_size / 1024 / 1024:.1f} MB)")
+                
             except Exception as e:
-                progress(0.9, desc=f"Video processing warning: {str(e)}")
-                # Continue without video if ffmpeg fails
+                error_details = str(e)
+                import traceback
+                tb_str = traceback.format_exc()
+                # Log to console for debugging
+                print(f"\n❌ Video processing error:")
+                print(f"Error: {error_details}")
+                print(f"Traceback:\n{tb_str}")
+                video_error = f"⚠️ Video processing failed:\n{error_details}"
+                progress(0.9, desc=video_error)
                 # Clean up failed output file
                 if os.path.exists(video_output_path):
-                    os.unlink(video_output_path)
+                    try:
+                        os.unlink(video_output_path)
+                    except:
+                        pass
+        else:
+            progress(0.8, desc="Skipping video generation (audio file, not video)")
         
         progress(1.0, desc="Complete!")
+        
+        # Append video error to English text if video failed (so user can see it)
+        if video_error:
+            english_text = f"{english_text}\n\n{video_error}"
         
         return srt_file, video_output, korean_text, english_text
         

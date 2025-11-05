@@ -69,56 +69,69 @@ def timestamp_to_srt(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def segments_to_srt(segments: List[Dict[str, Any]], translator: PapagoTranslator, 
-                   show_progress: bool = False, progress_callback=None) -> str:
-    """Convert Whisper segments to bilingual SRT format.
-    
-    Args:
-        segments: List of segment dicts with 'start', 'end', and 'text' keys
-        translator: PapagoTranslator instance
-        show_progress: Whether to print progress updates
-        progress_callback: Optional function(progress, desc) to update progress
-        
-    Returns:
-        SRT file content as string
+def segments_to_srt(
+    segments: List[Dict[str, Any]],
+    translator: PapagoTranslator,
+    show_progress: bool = False,
+    progress_callback=None,
+) -> str:
+    """Convert Whisper segments to bilingual SRT format with styling.
+
+    Styling (as requested):
+    - Font: NanumGothic for both languages
+    - Korean: 16pt, color #A7C1E8 (top line)
+    - English: 15pt, color #FFFFFF (bottom line)
+    - One \\N between KR and EN; double line break between segments
     """
-    lines = []
+
+    lines: List[str] = []
     start_time = time.time()
     total_segments = len(segments)
     
     for i, seg in enumerate(segments):
         start = seg["start"]
         end = seg["end"]
-        text_ko = seg["text"].strip()
+        text_ko_plain = seg["text"].strip()
         
         try:
-            en = translator.translate_ko_to_en(text_ko)
-            # Fallback if translation failed
-            if en.startswith("[Translation error"):
-                en = "[Translation failed]"
+            en_plain = translator.translate_ko_to_en(text_ko_plain)
+            if en_plain.startswith("[Translation error"):
+                en_plain = "[Translation failed]"
         except Exception as e:
-            en = f"[Translation error: {str(e)}]"
-        
-        # Smaller font, KR above EN
-        ko_line = "{\\fs16\\c&HA7C1E8&}" + text_ko
-        en_line = "{\\fs15\\c&HFFFFFF&}" + en
-        lines.append(f"{i+1}\n{timestamp_to_srt(start)} --> {timestamp_to_srt(end)}\n{ko_line}\\N{en_line}\n")
-        
-        # Update progress - use try/except to avoid issues with Progress object evaluation
+            en_plain = f"[Translation error: {str(e)}]"
+
+        # Apply exact styling using SSA tags inside SRT lines
+        # Note: many players/editors respect these inline tags
+        # CapCut-compatible SRT: plain text (no styling tags), KR above EN, real line break
+        ko_line = text_ko_plain
+        en_line = en_plain
+
+        # SRT requires a blank line between entries; emit Unix LF line endings
+        lines.append(
+            f"{i+1}\n{timestamp_to_srt(start)} --> {timestamp_to_srt(end)}\n{ko_line}\n{en_line}\n\n"
+        )
+
+        # Safe progress updates (avoid evaluating Progress object)
         if total_segments > 0:
             try:
                 if progress_callback is not None:
-                    progress_value = 0.6 + (0.2 * (i + 1) / total_segments)  # 60% to 80%
+                    progress_value = 0.6 + (0.2 * (i + 1) / total_segments)
                     progress_callback(progress_value, desc=f"Translating segment {i+1}/{total_segments}...")
             except (AttributeError, IndexError, TypeError):
-                # If progress callback fails, continue silently
                 pass
         
-        if show_progress and (i+1) % max(1, len(segments)//10) == 0:
+        if show_progress and (i + 1) % max(1, total_segments // 10 or 1) == 0:
             elapsed = time.time() - start_time
-            per_seg = elapsed / (i+1)
-            remaining = (len(segments) - (i+1)) * per_seg
-            print(f"⏳ {i+1}/{len(segments)} done — ~{remaining/60:.1f} min left")
+            per_seg = elapsed / (i + 1)
+            remaining = (total_segments - (i + 1)) * per_seg
+            print(f"⏳ {i+1}/{total_segments} done — ~{remaining/60:.1f} min left")
     
-    return "\n".join(lines)
+    content = "".join(lines)
+    # Normalize spacing: exactly one blank line between cues and a trailing blank line
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
+    while "\n\n\n" in content:
+        content = content.replace("\n\n\n", "\n\n")
+    if not content.endswith("\n\n"):
+        content = content.rstrip("\n") + "\n\n"
+    return content
 

@@ -1,0 +1,28 @@
+[
+{
+  "id": "frontend-smoke",
+  "title": "Frontend UI Smoke Tests",
+  "description": "Verify Gradio app loads, shows controls, and basic UI text is present.",
+  "baseUrl": "http://localhost:7860",
+  "steps": [
+    { "action": "navigate", "path": "/" },
+    { "action": "assert_text", "text": "Korean Audio Transcription & Translation" },
+    { "action": "assert_text", "text": "Audio/Video File" },
+    { "action": "assert_text", "text": "Process" }
+  ]
+},
+{
+  "id": "e2e-mp4",
+  "title": "E2E: Upload MP4 and Process",
+  "description": "Upload tiny MP4, click Process, wait for completion text.",
+  "baseUrl": "http://localhost:7860",
+  "steps": [
+    { "action": "navigate", "path": "/" },
+    { "action": "upload", "label": "Audio/Video File", "path": "testsprite_tests/assets/sample.mp4" },
+    { "action": "click", "text": "Process" },
+    { "action": "wait_for_text", "text": "Complete!", "timeoutMs": 600000 }
+  ]
+}
+]
+
+

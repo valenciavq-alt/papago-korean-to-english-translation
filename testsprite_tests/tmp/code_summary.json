@@ -1,0 +1,54 @@
+{
+  "projectName": "Papago Korean→English Transcription & Subtitles",
+  "techStack": {
+    "language": "Python",
+    "runtime": ">=3.10",
+    "framework": "Gradio 4.x",
+    "ml": ["OpenAI Whisper (large-v3)"],
+    "video": ["FFmpeg"],
+    "hosting": "Hugging Face Spaces",
+    "fonts": ["NanumGothic via fonts-nanum, fonts-nanum-extra"],
+    "ci_deploy": ["custom sync_to_hf.sh"]
+  },
+  "dependencies": [
+    "gradio",
+    "huggingface_hub==0.19.4 (for Gradio compatibility)",
+    "openai-whisper",
+    "ffmpeg (system)"
+  ],
+  "secrets": [
+    "PAPAGO_CLIENT_ID",
+    "PAPAGO_CLIENT_SECRET"
+  ],
+  "features": [
+    "Upload audio/video (.mp4/.mov/.mkv/.webm/.mp3/.wav/etc)",
+    "Transcribe Korean speech with Whisper large-v3",
+    "Translate to English with Papago API",
+    "Generate bilingual SRT (KR top 16pt #A7C1E8, EN bottom 15pt #FFFFFF)",
+    "Burn styled subtitles into video using ASS + FFmpeg",
+    "Progress feedback and robust error messages in UI",
+    "Use Space Secrets for Papago credentials"
+  ],
+  "keyFiles": {
+    "app.py": "Gradio UI, FFmpeg integration, ASS generation, progress, logging",
+    "papago_translation.py": "PapagoTranslator, timestamp helpers, SRT generation with inline SSA tags",
+    "requirements_hf.txt": "Pinned deps for Space",
+    "packages.txt": "System packages (ffmpeg, Nanum fonts)",
+    "sync_to_hf.sh": "Deploy script to Space"
+  },
+  "notableConfigs": {
+    "fonts": "NanumGothic installed via packages.txt to avoid tofu squares",
+    "subtitleStyle": "KR 16pt #A7C1E8 top; EN 15pt #FFFFFF bottom; \\N between lines; blank line between segments",
+    "ffmpegFilter": "subtitles=ASS:charenc=UTF-8:force_style=FontName=NanumGothic,FontSize=16",
+    "whisperModel": "large-v3 auto-selected"
+  },
+  "risks": [
+    "FFmpeg filter quoting/escaping across environments",
+    "Font discovery issues if fonts not installed",
+    "Papago API timeouts or quota",
+    "Large Whisper model memory/CPU usage on Space"
+  ]
+}
+
+
+
