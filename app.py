@@ -568,8 +568,7 @@ if __name__ == "__main__":
     demo.queue(
         default_concurrency_limit=2,
         max_size=64,
-        status_update_rate=1,
-        timeout=3600  # 1 hour timeout for long video processing
+        status_update_rate=1
     )
     # Let Gradio auto-detect for Hugging Face Spaces
     demo.launch()
