@@ -478,7 +478,18 @@ def transcribe_and_translate(
 
 
 # Create Gradio interface
-with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(
+    title="Papago Korean Translation",
+    theme=gr.themes.Soft(),
+    css='''
+    :root { --card-bg: #ffffff; --card-border: #e8e8e8; --muted: #6b7280; }
+    #status-bar { position: sticky; top: 0; z-index: 10; background: #f8fafc; border-bottom: 1px solid #e5e7eb; padding: 8px 12px; }
+    #upload-status { color: #0f766e; }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 12px; }
+    .card h4 { margin: 0 0 6px 0; }
+    .hint { color: var(--muted); font-size: 0.9em; }
+    '''
+) as demo:
     # HERO / BANNER
     gr.Markdown(
         """
@@ -497,85 +508,77 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
         - 🎬 **Video with Subtitles** - Automatically generates video with Korean and English subtitles burned in
         """
     )
-    # (Removed inline Features/How to use block to avoid duplication)
-    
-    # Removed step headers to avoid redundancy
-
-    # NOTE (avoid repeating features listed below)
-    gr.Markdown("Note: Papago API credentials are configured in Space settings (Secrets).")
+    # Sticky status / tips bar
+    gr.Markdown("✅ Ready — Papago credentials set in Space Secrets.", elem_id="status-bar")
 
     with gr.Row():
         with gr.Column():
-            upload_type = gr.Radio(
-                ["Video", "Audio"],
-                value="Video",
-                label="Upload Type"
-            )
-            audio_input = gr.File(
-                label="Audio/Video File (한국어로 된 영상 또는 음성을 업로드하세요)",
-                file_types=[".mp3", ".wav", ".mp4", ".avi", ".m4a", ".flac", ".mov", ".mkv"]
-            )
-            upload_status = gr.Markdown("", elem_id="upload-status")
-            url_input = gr.Textbox(
-                label="Or paste a direct media URL (optional)",
-                placeholder="https://... (MP4/MOV/MP3/WAV)",
-            )
-            
-            process_btn = gr.Button("🚀 Process", variant="primary", size="lg")
-            gr.Markdown(
-                """
-                Upload auto-starts processing when finished. You can switch apps after upload—processing continues in the background.
-                
-                Tip: Larger videos upload slower over mobile data. For fastest results, use Wi‑Fi.
-                """
-            )
+            with gr.Tabs():
+                with gr.Tab("Upload File"):
+                    audio_input = gr.File(
+                        label="Audio/Video File (한국어로 된 영상 또는 음성을 업로드하세요)",
+                        file_types=[".mp3", ".wav", ".mp4", ".avi", ".m4a", ".flac", ".mov", ".mkv"]
+                    )
+                    upload_status = gr.Markdown("", elem_id="upload-status")
+                    gr.Markdown("<span class=hint>Tip: Wi‑Fi uploads are faster than mobile data.</span>", elem_classes=["hint"])
+                with gr.Tab("From URL"):
+                    url_input = gr.Textbox(
+                        label="Paste a direct media URL",
+                        placeholder="https://... (MP4/MOV/MP3/WAV)",
+                    )
+                    gr.Markdown("<span class=hint>Server downloads are often faster and avoid mobile timeouts.</span>", elem_classes=["hint"])
+            process_btn = gr.Button("🚀 Process", variant="primary")
         
         with gr.Column():
-            video_output = gr.Video(label="🎬 Video with Burned-in Subtitles (Korean + English)")
-            srt_output = gr.File(label="📄 SRT Subtitle File (for CapCut)")
+            with gr.Row():
+                with gr.Column(elem_classes=["card"]):
+                    srt_output = gr.File(label="📄 SRT Subtitle File (for CapCut)")
+                with gr.Column(elem_classes=["card"]):
+                    video_output = gr.Video(label="🎬 Video with Burned-in Subtitles (Korean + English)")
             
             with gr.Tabs():
                 with gr.Tab("Korean Transcription"):
                     korean_output = gr.Textbox(
                         label="Korean Text",
-                        lines=15,
-                        max_lines=20,
+                        lines=12,
+                        max_lines=16,
                         placeholder="Korean transcription will appear here..."
                     )
-                
                 with gr.Tab("English Translation"):
                     english_output = gr.Textbox(
                         label="English Translation",
-                        lines=15,
-                        max_lines=20,
+                        lines=12,
+                        max_lines=16,
                         placeholder="English translation will appear here..."
                     )
 
             # Quick text translation section
-            gr.Markdown("### Quick Text Translation (Korean → English)")
-            ko_text_input = gr.Textbox(
-                label="Korean Text",
-                placeholder="여기에 한국어 텍스트를 입력하세요",
-                lines=4,
-                max_lines=8
-            )
-            translate_btn = gr.Button("Translate text")
-            en_text_output = gr.Textbox(
-                label="English Output",
-                lines=4,
-                max_lines=8,
-                interactive=False
-            )
+            with gr.Box(elem_classes=["card"]):
+                gr.Markdown("#### Quick Text Translation (Korean → English)")
+                ko_text_input = gr.Textbox(
+                    label="Korean Text",
+                    placeholder="여기에 한국어 텍스트를 입력하세요",
+                    lines=4,
+                    max_lines=8
+                )
+                translate_btn = gr.Button("Translate text")
+                en_text_output = gr.Textbox(
+                    label="English Output",
+                    lines=4,
+                    max_lines=8,
+                    interactive=False
+                )
     
-    # BOTTOM: HOW TO USE + NOTE
-    gr.Markdown(
-        """
-        ### 📥 How to use:
-        - Upload an audio or video file containing Korean speech  
-        - Click ‘Process’ to transcribe and translate  
-        - Download: **SRT file**; **Video with subtitles**
-        """
-    )
+    # BOTTOM: HOW TO USE + FAQ
+    with gr.Accordion("📥 How to use / FAQ", open=False):
+        gr.Markdown(
+            """
+            - Upload a Korean audio/video file or paste a direct URL
+            - Processing auto-starts after upload; SRT appears first
+            - Video downloads after burn-in completes
+            - If on mobile, you can switch apps—processing continues server-side
+            """
+        )
 
     # FOOTER (removed on request)
     
