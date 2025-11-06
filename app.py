@@ -79,28 +79,11 @@ def _format_eta(seconds_total: int) -> str:
 
 
 def on_upload_complete(file_obj):
-    """Return upload-complete message and update SRT/Video component labels with ETA immediately."""
-    media_path = _extract_file_path(file_obj)
-    dur_sec = get_media_duration_seconds(media_path) if media_path else None
-
-    # Heuristics
-    srt_eta = None
-    burn_eta = None
-    if isinstance(dur_sec, (int, float)) and dur_sec > 0:
-        srt_eta = int(dur_sec * 0.6 + 20)
-        burn_eta = int(dur_sec * 8 + 30)
-
+    """Return upload-complete message. Processing continues server-side even if tab closes."""
     base = (
         "✅ Upload complete. When you tap ‘Process’, processing runs on the server and will continue even if you leave the app."
     )
-    srt_label = "📄 SRT Subtitle File (for CapCut)"
-    video_label = "🎬 Video with Burned-in Subtitles (Korean + English)"
-    if srt_eta:
-        srt_label = f"📄 SRT Subtitle File (for CapCut) — ETA {_format_eta(srt_eta)}"
-    if burn_eta:
-        video_label = f"🎬 Video with Burned-in Subtitles (Korean + English) — ETA {_format_eta(burn_eta)}"
-    # Return component updates for labels (no value change yet)
-    return base, gr.update(value=None, label=srt_label), gr.update(value=None, label=video_label)
+    return base
 
 
 def get_media_duration_seconds(media_path: str) -> float | None:
@@ -281,19 +264,22 @@ def transcribe_and_translate(
         Tuple of (SRT file, video with subtitles, Korean text, English text, SRT ETA text, Video ETA text)
     """
     if audio_file is None and not url_input:
-        return None, None, "Please upload an audio or video file or provide a URL.", None, "", ""
+        yield None, None, "Please upload an audio or video file or provide a URL.", None
+        return
     
     # Get credentials from environment variables (Hugging Face Secrets)
     papago_client_id = os.getenv("PAPAGO_CLIENT_ID")
     papago_client_secret = os.getenv("PAPAGO_CLIENT_SECRET")
     
     if not papago_client_id or not papago_client_secret:
-        return None, None, "Error: Papago API credentials not found in Space secrets. Please add PAPAGO_CLIENT_ID and PAPAGO_CLIENT_SECRET in Settings → Secrets.", None
+        yield None, None, "Error: Papago API credentials not found in Space secrets. Please add PAPAGO_CLIENT_ID and PAPAGO_CLIENT_SECRET in Settings → Secrets.", None
+        return
     
     try:
         # Handle Gradio File object
         if audio_file is None and not url_input:
-            return None, None, "Please upload an audio or video file or provide a URL.", None, "", ""
+            yield None, None, "Please upload an audio or video file or provide a URL.", None
+            return
         
         # Determine source: uploaded file or server-side download from URL
         if audio_file is not None:
@@ -316,7 +302,8 @@ def transcribe_and_translate(
                 audio_path = os.path.join(tmp_dir, url_fname)
                 urllib.request.urlretrieve(url_input, audio_path)
             except Exception as e:
-                return None, None, f"Failed to download from URL: {e}", None
+                yield None, None, f"Failed to download from URL: {e}", None
+                return
         
         # Check if input is video or audio
         is_video = any(audio_path.lower().endswith(ext) for ext in ['.mp4', '.avi', '.mov', '.mkv', '.webm'])
@@ -345,19 +332,19 @@ def transcribe_and_translate(
             )
             segments = result["segments"]
         else:
-            return None, None, "Error: Whisper package not installed.", None
+            yield None, None, "Error: Whisper package not installed.", None
+            return
         
         if not segments:
-            return None, None, "No speech detected in the audio.", None
+            yield None, None, "No speech detected in the audio.", None
+            return
         
         # Initialize translator
         progress(0.5, desc="Initializing translator...")
         translator = PapagoTranslator(papago_client_id, papago_client_secret)
         
-        # Generate bilingual SRT with progress tracking and ETA
-        est_translate_secs = max(5, int(len(segments) * 1.2))  # heuristic ~1.2s per segment
-        srt_eta_text = f"Estimated time: ~{_format_eta(est_translate_secs)}"
-        progress(0.6, desc=f"Translating {len(segments)} segments (~{est_translate_secs}s)...")
+        # Generate bilingual SRT with progress tracking
+        progress(0.6, desc=f"Translating {len(segments)} segments...")
         srt_content = segments_to_srt(segments, translator, show_progress=False, progress_callback=progress)
         
         # Extract Korean and English text for preview
@@ -386,21 +373,20 @@ def transcribe_and_translate(
             with open(srt_file, 'w', encoding='utf-8') as f:
                 f.write(srt_content)
         
+        # Yield SRT immediately so user can download it (don't wait for video)
+        srt_label_ready = "📄 SRT Subtitle File (for CapCut) ✅ Ready"
+        yield (
+            gr.update(value=srt_file, label=srt_label_ready),
+            None,  # Video not ready yet
+            korean_text,
+            english_text,
+        )
+        
         # Generate video with burned-in subtitles if input is video
         video_output = None
         video_error = None
-        video_eta_text = ""
         if is_video:
-            # Estimate burn-in time from input duration (heuristic ~8x realtime + 30s setup)
-            vid_dur = vid_duration
-            if vid_dur is not None and vid_dur > 0:
-                est_burn_secs = int(vid_dur * 8 + 30)
-                if est_burn_secs > 900:
-                    est_burn_secs = 900  # cap at 15 minutes to avoid scaring users
-                video_eta_text = f"Estimated time: ~{_format_eta(est_burn_secs)}"
-                progress(0.8, desc=f"Burning subtitles into video (~{est_burn_secs//60}m {est_burn_secs%60}s)...")
-            else:
-                progress(0.8, desc=f"Burning subtitles into video (input: {os.path.basename(audio_path)})...")
+            progress(0.8, desc=f"Burning subtitles into video...")
             # Use a more accessible temp directory for video output
             temp_dir = tempfile.gettempdir()
             video_output_path = os.path.join(temp_dir, f"subtitled_{int(time.time())}.mp4")
@@ -449,16 +435,14 @@ def transcribe_and_translate(
         if video_error:
             english_text = f"{english_text}\n\n{video_error}"
         
-        # Update labels with final ETA text (if computed)
-        srt_label_final = "📄 SRT Subtitle File (for CapCut)"
+        # Final yield with video ready (or None if not video or failed)
+        srt_label_final = "📄 SRT Subtitle File (for CapCut) ✅"
         video_label_final = "🎬 Video with Burned-in Subtitles (Korean + English)"
-        if srt_eta_text:
-            srt_label_final = f"{srt_label_final} — {srt_eta_text}"
-        if video_eta_text:
-            video_label_final = f"{video_label_final} — {video_eta_text}"
-        return (
+        if video_output:
+            video_label_final = f"{video_label_final} ✅"
+        yield (
             gr.update(value=srt_file, label=srt_label_final),
-            gr.update(value=video_output, label=video_label_final),
+            gr.update(value=video_output, label=video_label_final) if video_output else None,
             korean_text,
             english_text,
         )
@@ -467,7 +451,7 @@ def transcribe_and_translate(
         error_msg = f"Error: {str(e)}"
         import traceback
         traceback.print_exc()
-        return None, None, error_msg, None
+        yield None, None, error_msg, None
 
 
 # Create Gradio interface
@@ -567,7 +551,7 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
     audio_input.upload(
         fn=on_upload_complete,
         inputs=[audio_input],
-        outputs=[upload_status, srt_output, video_output]
+        outputs=[upload_status]
     )
 
     # Auto-start processing immediately after upload so job is queued server-side
@@ -579,7 +563,13 @@ with gr.Blocks(title="Papago Korean Translation", theme=gr.themes.Soft()) as dem
 
 
 if __name__ == "__main__":
-    # Enable queue for background processing on Spaces/mobile (jobs persist server-side)
-    demo.queue(default_concurrency_limit=2, max_size=64, status_update_rate=1)
+    # Enable queue with increased timeout to prevent mobile disconnection issues
+    # Jobs continue server-side even if client disconnects
+    demo.queue(
+        default_concurrency_limit=2,
+        max_size=64,
+        status_update_rate=1,
+        timeout=3600  # 1 hour timeout for long video processing
+    )
     # Let Gradio auto-detect for Hugging Face Spaces
     demo.launch()
